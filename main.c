@@ -23,12 +23,13 @@ int main() {
 
 	printf("Socket binding successful to port %d at address %d\n", ntohs(sockname.sin_port), sockname.sin_addr.s_addr);
 
-	// is there a better way to test stuff like this instead of a busyloop?
-	while (1) {
-
-	}
-
-	// what's up with Telnet?
+   /*
+	* is there a better way to test stuff like this instead of a busyloop?
+	* while (1) {
+	* 	this can wait til morning! accept() is a bridge too far tonight..
+	* 
+	* }
+	*/
 
 	return 0;
 }
