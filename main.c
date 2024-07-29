@@ -5,12 +5,12 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/select.h>
+#include <unistd.h>
+#include <fcntl.h>
 
-int main() {
-	int socket_fd = socket(AF_INET, SOCK_STREAM, 0);		/* listening socket */
-
-	struct sockaddr_in server_sockname, client_sockname;
-	int client_fd;
+int create_server() {
+	int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+	struct sockaddr_in server_sockname;
 
 	server_sockname.sin_family = AF_INET;
 	server_sockname.sin_port = htons(8080); 
@@ -30,8 +30,54 @@ int main() {
 	}
 	printf("Socket is listening on port %d\n", ntohs(server_sockname.sin_port)); /* move this stuff into some logger.h or something */
 
-       
-	/* int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout); */
+	return socket_fd;
+}
+
+int accept_new(int source_fd) {
+	struct sockaddr_in client_sockname;
+	socklen_t client_addr_len = sizeof(client_sockname);
+
+	int client_fd = accept(source_fd, (struct sockaddr *)&client_sockname, &client_addr_len);
+	if (client_fd == -1) {
+		perror("Failed to accept connection on listening socket");
+	}
+
+	printf("Accepted new client socket connection!\n");
+	printf("File descriptor: %d\n", client_fd);
+	printf("Client address: %s\n", inet_ntoa(client_sockname.sin_addr));
+	printf("Client port: %d\n", ntohs(client_sockname.sin_port));
+
+	return client_fd;
+}
+
+/* NB: quick before-bed test to see if I can get something in the browser, no error handling or anything */
+void serve_page(int source_fd) {
+	char html_buffer[4096];
+
+	int html_fd = open("www/index.html", O_RDONLY);	
+	ssize_t bytes_read = read(html_fd, &html_buffer, sizeof(html_buffer) - 1);
+	ssize_t bytes_written = write(source_fd, &html_buffer, sizeof(html_buffer));
+	
+	/* ? */ /* also remove from rfds */
+	close(source_fd);
+	close(html_fd);
+}
+
+/* NB: quick before-bed test to see if I can get something in the browser, no error handling or anything */
+void read_from(int source_fd) {
+	printf("Data ready to read from %d\n", source_fd);	
+
+	char read_buffer[1024];
+	ssize_t bytes_read = read(source_fd, &read_buffer, sizeof(read_buffer) - 1);
+	read_buffer[bytes_read] = '\0';
+	printf("Data read: %s\n", read_buffer);
+
+	/* for now to test */
+	serve_page(source_fd);
+}
+
+int main() {
+	int socket_fd = create_server(); /* listening socket */
 
 	/* variables and datastructures for the select() polling loop below */
 	int nfds = socket_fd + 1;	/* initial value for highest value file descriptor for select() */
@@ -40,16 +86,8 @@ int main() {
 	FD_SET(socket_fd, &rfds);
 	struct timeval select_timeout;
 
-	/* What we're doing in the while loop: 
-	 * - create a copy of our file descriptor set (done)
-	 * - select()  (done)
-	 * - handle read results:
-	 *    - accept() on fd == listener
-	 *    - read() otherwise
-	 *		- parse & if GET, write() the html file
-	 */
 	while (1) {
-		/* redefine timeval struct -- I believe this is needed after select() returns */
+		/* redefine timeval struct */ 
 		select_timeout.tv_sec = 5;
 		select_timeout.tv_usec = 0;
 		/* copy rfds */
@@ -60,33 +98,21 @@ int main() {
 		if (select_return_status == -1)
 			perror("select() error status");
 		else if (select_return_status == 0)
-			printf("select() timeout");
+			printf("select() timeout\n");
 	
 		/* iterate through the file descriptors */
 		for (int i = 0; i < nfds; i++) {
 			/* file descriptor 'i' exists in the ready-to-read set mutated by select() at return time */
 			if (FD_ISSET(i, &temp_rfds)) {
 				if (i == socket_fd) {	/* listening socket */
-					printf("hello listener\n");
+					int client_fd = accept_new(socket_fd);
+					FD_SET(client_fd, &rfds);
+					nfds = client_fd+1;
 				} else {				/* client connection socket */
-					printf("hello client\n");
+					read_from(i);
 				}
 			}
 		}
-
-
-		/* old stuff */
-		socklen_t client_addr_len = sizeof(client_sockname);
-		client_fd = accept(socket_fd, (struct sockaddr *)&client_sockname, &client_addr_len);
-		if (client_fd == -1) {
-			perror("Failed to accept connection on listening socket");
-		}
-
-		printf("Accepted new client socket connection!\n");
-		printf("File descriptor: %d\n", client_fd);
-		printf("Client address: %s\n", inet_ntoa(client_sockname.sin_addr));
-		printf("Client port: %d\n", ntohs(client_sockname.sin_port));
 	}
-
 	return 0;
 }
