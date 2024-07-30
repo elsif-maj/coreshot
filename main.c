@@ -52,12 +52,18 @@ int accept_new(int source_fd) {
 
 /* NB: quick before-bed test to see if I can get something in the browser, no error handling or anything */
 void serve_page(int source_fd) {
+	/* what if it is bigger? */
 	char html_buffer[4096];
+	char headers[] = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n";
 
 	int html_fd = open("www/index.html", O_RDONLY);	
 	ssize_t bytes_read = read(html_fd, &html_buffer, sizeof(html_buffer) - 1);
-	ssize_t bytes_written = write(source_fd, &html_buffer, sizeof(html_buffer));
+
+	/* combine these */
+	write(source_fd, &headers, sizeof(headers));
+	ssize_t bytes_written = write(source_fd, &html_buffer, bytes_read);
 	
+
 	/* ? */ /* also remove from rfds */
 	close(source_fd);
 	close(html_fd);
@@ -71,6 +77,9 @@ void read_from(int source_fd) {
 	ssize_t bytes_read = read(source_fd, &read_buffer, sizeof(read_buffer) - 1);
 	read_buffer[bytes_read] = '\0';
 	printf("Data read: %s\n", read_buffer);
+
+	/* check for http method */
+	/* ... */
 
 	/* for now to test */
 	serve_page(source_fd);
@@ -110,6 +119,7 @@ int main() {
 					nfds = client_fd+1;
 				} else {				/* client connection socket */
 					read_from(i);
+					FD_CLR(i, &rfds);
 				}
 			}
 		}
