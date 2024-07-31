@@ -7,6 +7,8 @@
 #include <sys/select.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
 
 int create_server() {
 	int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -52,7 +54,7 @@ int accept_new(int source_fd) {
 
 /* NB: quick before-bed test to see if I can get something in the browser, no error handling or anything */
 void serve_page(int source_fd) {
-	/* what if it is bigger? */
+	/* what if it is bigger? loop? */
 	char html_buffer[4096];
 	char headers[] = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n";
 
@@ -69,26 +71,46 @@ void serve_page(int source_fd) {
 	close(html_fd);
 }
 
-/* NB: quick before-bed test to see if I can get something in the browser, no error handling or anything */
-void read_from(int source_fd) {
-	printf("Data ready to read from %d\n", source_fd);	
-
-	char read_buffer[1024];
-	ssize_t bytes_read = read(source_fd, &read_buffer, sizeof(read_buffer) - 1);
-	read_buffer[bytes_read] = '\0';
-	printf("Data read: %s\n", read_buffer);
-
-	/* check for http method */
-	/* ... */
-
-	/* for now to test */
+void handle_request(int source_fd, char* req) {
+	/* parse and check HTTP here */
 	serve_page(source_fd);
+}
+
+void read_from(int source_fd) {
+	char read_buffer[4096];
+	ssize_t bytes_read;
+	char *request = NULL; 
+
+	
+    int flags = fcntl(source_fd, F_GETFL, 0);
+    fcntl(source_fd, F_SETFL, flags | O_NONBLOCK);
+	while ((bytes_read = read(source_fd, read_buffer, sizeof(read_buffer) - 1)) > 0) {
+		read_buffer[bytes_read] = '\0';
+
+		char *temp = realloc(request, (request ? strlen(request) : 0) + bytes_read + 1);
+		if (!temp) {
+			perror("Failed to allocate memory for request");
+			free(request);
+			return;
+		}
+
+		request = temp;
+		strcat(request, read_buffer);
+	}
+
+	if (bytes_read == -1) {
+		/* handle nonblocking return values here */
+		perror("Error reading request");
+		free(request);
+		/* return; */
+	}
+
+	handle_request(source_fd, request);
 }
 
 int main() {
 	int socket_fd = create_server(); /* listening socket */
 
-	/* variables and datastructures for the select() polling loop below */
 	int nfds = socket_fd + 1;	/* initial value for highest value file descriptor for select() */
 	fd_set rfds;				/* set of file descriptors watched for ready-to-read events */
 	FD_ZERO(&rfds);		
@@ -100,23 +122,20 @@ int main() {
 		select_timeout.tv_sec = 5;
 		select_timeout.tv_usec = 0;
 		/* copy rfds */
-		fd_set temp_rfds = rfds;	/* really? */
+		fd_set temp_rfds = rfds;
 
-		/* lfg */
 		int select_return_status = select(nfds, &temp_rfds, NULL, NULL, &select_timeout);
 		if (select_return_status == -1)
 			perror("select() error status");
-		else if (select_return_status == 0)
-			printf("select() timeout\n");
 	
 		/* iterate through the file descriptors */
 		for (int i = 0; i < nfds; i++) {
-			/* file descriptor 'i' exists in the ready-to-read set mutated by select() at return time */
 			if (FD_ISSET(i, &temp_rfds)) {
 				if (i == socket_fd) {	/* listening socket */
 					int client_fd = accept_new(socket_fd);
 					FD_SET(client_fd, &rfds);
-					nfds = client_fd+1;
+					if (client_fd >= nfds) 
+						nfds = client_fd + 1;
 				} else {				/* client connection socket */
 					read_from(i);
 					FD_CLR(i, &rfds);
