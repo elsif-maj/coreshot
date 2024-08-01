@@ -1,6 +1,7 @@
 #include <bits/types/struct_timeval.h>
 #include <stdio.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -9,6 +10,12 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+
+struct http_req {
+	char *method;
+	char *path;
+};
 
 int create_server() {
 	int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -52,9 +59,8 @@ int accept_new(int source_fd) {
 	return client_fd;
 }
 
-/* NB: quick before-bed test to see if I can get something in the browser, no error handling or anything */
 void serve_page(int source_fd) {
-	/* what if it is bigger? loop? */
+	/* loop if bigger */
 	char html_buffer[4096];
 	char headers[] = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n";
 
@@ -71,8 +77,22 @@ void serve_page(int source_fd) {
 	close(html_fd);
 }
 
+struct http_req parse_req(char *req) {
+	printf("%s\n", req);
+	struct http_req this_req;
+
+	/* parse the req into http_req */
+
+	this_req.method = "hello";
+	this_req.path = "world";
+	return this_req;
+}
+
 void handle_request(int source_fd, char* req) {
-	/* parse and check HTTP here */
+	struct http_req this_req = parse_req(req);
+
+	/* take struct and handle it for various routes and methods */
+
 	serve_page(source_fd);
 }
 
@@ -98,11 +118,13 @@ void read_from(int source_fd) {
 		strcat(request, read_buffer);
 	}
 
+	/* check if -1 results from actual error, or because there was no data to read */
 	if (bytes_read == -1) {
-		/* handle nonblocking return values here */
-		perror("Error reading request");
-		free(request);
-		/* return; */
+		if (errno != EAGAIN && errno != EWOULDBLOCK) {
+			perror("Error reading request");
+			free(request);
+			return;
+		}
 	}
 
 	handle_request(source_fd, request);
