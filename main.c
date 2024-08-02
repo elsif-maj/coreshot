@@ -118,7 +118,7 @@ void read_from(int source_fd) {
 		strcat(request, read_buffer);
 	}
 
-	/* check if -1 results from actual error, or because there was no data to read */
+	/* check errno for expected and non-problematic statuses from non-blocking reads of no data */
 	if (bytes_read == -1) {
 		if (errno != EAGAIN && errno != EWOULDBLOCK) {
 			perror("Error reading request");
