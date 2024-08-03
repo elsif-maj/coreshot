@@ -12,6 +12,8 @@
 #include <string.h>
 #include <errno.h>
 
+#define BUFFER 4096
+
 struct http_req {
 	char *method;
 	char *path;
@@ -60,50 +62,123 @@ int accept_new(int source_fd) {
 }
 
 void serve_page(int source_fd) {
-	/* loop if bigger */
-	char html_buffer[4096];
+	char html_buffer[BUFFER];
 	char headers[] = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n";
+	ssize_t bytes_read, bytes_written;
 
-	int html_fd = open("www/index.html", O_RDONLY);	
-	ssize_t bytes_read = read(html_fd, &html_buffer, sizeof(html_buffer) - 1);
+	int html_fd = open("www/testLarge.html", O_RDONLY);	
+	if (html_fd == -1) {
+		perror("Error opening file");
+		return;
+	}
 
-	/* combine these */
-	write(source_fd, &headers, sizeof(headers));
-	ssize_t bytes_written = write(source_fd, &html_buffer, bytes_read);
+	bytes_written = write(source_fd, &headers, sizeof(headers));
+	if (bytes_written == -1) {
+		perror("Error writing headers");
+		return;
+	}
+
+	while ((bytes_read = read(html_fd, &html_buffer, sizeof(html_buffer) - 1)) > 0) {
+		bytes_written = 0;
+		bytes_written = write(source_fd, &html_buffer, bytes_read);
+		if (bytes_written < bytes_read) {
+			perror("Couldn't write whole buffer to source_fd");
+			break;
+		}
+	}
 	
-
-	/* ? */ /* also remove from rfds */
-	close(source_fd);
-	close(html_fd);
+	if (close(source_fd) == -1)
+		perror("Error closing source_fd");
+	if (close(html_fd) == -1)
+		perror("Error closing html_fd");
 }
 
-struct http_req parse_req(char *req) {
+/* refactor for 'unit start' and 'unit end' pointing to first and last chars -- get rid of offset */
+struct http_req parse_req(char *req, int *error) {
 	printf("%s\n", req);
-	struct http_req this_req;
 
-	/* parse the req into http_req */
+	int offset = 0;
+	struct http_req this_req = { NULL, NULL };
 
-	this_req.method = "hello";
-	this_req.path = "world";
+	/* parse http method */
+	char *method_end = req;
+	/* allow only 8 bytes of reading to find HTTP method */
+	while (*method_end != ' ' && offset < 8 && *method_end != '\0') {
+		method_end++;
+		offset += 1;
+	}
+
+	if (*method_end == ' ') {
+		char *method = malloc(offset + 1);
+		if (method == NULL) {
+			printf("Could not allocate memory for request method");
+			*error = 1;
+			return this_req;
+		}
+		memcpy(method, req, offset);
+		method[offset] = '\0';
+		this_req.method = method;
+	} else {
+		*error = 1;
+		printf("Could not parse request method");
+	}
+
+	/* parse http path */
+	char *path_end = method_end + 1;
+	offset = 0;
+	/* allow until end of req to find HTTP path */
+	while (*path_end != '\0' && *path_end != ' ')
+		path_end++;
+
+	if (*path_end == ' ') {
+		char *path = malloc(path_end - method_end);   /* contains one extra byte for '\0' */
+		if (path == NULL) {
+			printf("Could not allocate memory for request path");
+			*error = 1;
+			return this_req;
+		}
+		memcpy(path, method_end + 1, path_end - method_end - 1);
+		path[path_end - method_end - 1] = '\0';
+		this_req.path = path;
+	} else {
+		*error = 1;
+		printf("Could not parse request path");
+	}
+	
 	return this_req;
 }
 
 void handle_request(int source_fd, char* req) {
-	struct http_req this_req = parse_req(req);
+	int parse_error = 0;
+	struct http_req this_req = parse_req(req, &parse_error);
+	if (parse_error) {
+		printf("Error parsing request");
+		/* reply_400(): handle error by sending 400 ? */
+		return;
+	}
 
-	/* take struct and handle it for various routes and methods */
+	if (strcmp(this_req.method, "GET") == 0) {
+		printf("Do GET things\n");
+
+		if (strcmp(this_req.path, "/") == 0)
+			printf("We've got a '/' path!\n");
+	} else {
+		printf("Not a GET request");
+		/* send something suggesting unsupported method? */
+	}
 
 	serve_page(source_fd);
 }
 
 void read_from(int source_fd) {
-	char read_buffer[4096];
+	char read_buffer[BUFFER];
 	ssize_t bytes_read;
 	char *request = NULL; 
 
 	
     int flags = fcntl(source_fd, F_GETFL, 0);
     fcntl(source_fd, F_SETFL, flags | O_NONBLOCK);
+	/* handle maximum request size */
 	while ((bytes_read = read(source_fd, read_buffer, sizeof(read_buffer) - 1)) > 0) {
 		read_buffer[bytes_read] = '\0';
 
