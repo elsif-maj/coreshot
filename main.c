@@ -172,18 +172,13 @@ void handle_request(int source_fd, char* req) {
 	}
 
 	if (strcmp(this_req.method, "GET") == 0) {
-
-		/* make this a loop through a paths array? */
-		if (strcmp(this_req.path, "/") == 0)
-			serve_page(source_fd, this_req.path);
-		else if (strcmp(this_req.path, "/site") == 0)
-			serve_page(source_fd, this_req.path);
-		else if (strcmp(this_req.path, "/projects") == 0)
-			serve_page(source_fd, this_req.path);
-		else if (strcmp(this_req.path, "/links") == 0)
-			serve_page(source_fd, this_req.path);
-		else 
-			printf("Path doesn't match anything (404)\n");
+		for (int i = 0; i < sizeof(PAGES) / sizeof(PAGES[0]); i++) {
+			if (strcmp(this_req.path, PAGES[i]) == 0) {
+				serve_page(source_fd, this_req.path);
+				return;
+			}
+		}
+		printf("Path doesn't match anything (404)\n");	
 	} else {
 		printf("Not a GET request");
 		/* send something suggesting unsupported method? */
