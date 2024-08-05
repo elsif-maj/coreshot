@@ -28,7 +28,7 @@ int create_server() {
 
 	server_sockname.sin_family = AF_INET;
 	server_sockname.sin_port = htons(8080); 
-	server_sockname.sin_addr.s_addr = htonl(INADDR_ANY); 
+	server_sockname.sin_addr.s_addr = htonl(INADDR_ANY);   /* what am I going to need to do to add IPv6 support?? */
 
 	/* bind listening socket to address and port */
 	if (bind(socket_fd, (struct sockaddr *)&server_sockname, sizeof(server_sockname)) == -1) {
@@ -59,15 +59,13 @@ int accept_new(int source_fd) {
 	printf("Accepted new client socket connection!\n");
 	printf("File descriptor: %d\n", client_fd);
 	printf("Client address: %s\n", inet_ntoa(client_sockname.sin_addr));
-	printf("Client port: %d\n", ntohs(client_sockname.sin_port));
+	printf("Client port: %d\n\n", ntohs(client_sockname.sin_port));
 
 	return client_fd;
 }
 
 /* refactor for 'unit start' and 'unit end' pointing to first and last chars -- get rid of offset */
 struct http_req parse_req(char *req, int *error) {
-	printf("%s\n", req);
-
 	int offset = 0;
 	struct http_req this_req = { NULL, NULL };
 
@@ -82,7 +80,7 @@ struct http_req parse_req(char *req, int *error) {
 	if (*method_end == ' ') {
 		char *method = malloc(offset + 1);
 		if (method == NULL) {
-			printf("Could not allocate memory for request method");
+			printf("Could not allocate memory for request method\n");
 			*error = 1;
 			return this_req;
 		}
@@ -91,7 +89,7 @@ struct http_req parse_req(char *req, int *error) {
 		this_req.method = method;
 	} else {
 		*error = 1;
-		printf("Could not parse request method");
+		printf("Could not parse request method\n");
 	}
 
 	/* parse http path */
@@ -104,7 +102,7 @@ struct http_req parse_req(char *req, int *error) {
 	if (*path_end == ' ') {
 		char *path = malloc(path_end - method_end);   /* contains one extra byte for '\0' */
 		if (path == NULL) {
-			printf("Could not allocate memory for request path");
+			printf("Could not allocate memory for request path\n");
 			*error = 1;
 			return this_req;
 		}
@@ -113,7 +111,7 @@ struct http_req parse_req(char *req, int *error) {
 		this_req.path = path;
 	} else {
 		*error = 1;
-		printf("Could not parse request path");
+		printf("Could not parse request path\n");
 	}
 	
 	return this_req;
@@ -131,9 +129,10 @@ void serve_page(int source_fd, char *path) {
 		/* free??? */
 		char *full_path = malloc(sizeof(path)+7);
 		sprintf(full_path, "%s%s.html", PAGESDIR, path);
-		printf("%s\n", full_path);
+		printf("Request for %s from fd: %i\n", full_path, source_fd);
 
 		html_fd = open(full_path, O_RDONLY);	
+		free(full_path);
 	}
 
 	if (html_fd == -1) {
@@ -156,6 +155,7 @@ void serve_page(int source_fd, char *path) {
 		}
 	}
 	
+	printf("PAGE SERVED: now closing html page fd: %d and client fd: %d\n", html_fd, source_fd);
 	if (close(source_fd) == -1)
 		perror("Error closing source_fd");
 	if (close(html_fd) == -1)
@@ -180,10 +180,12 @@ void handle_request(int source_fd, char* req) {
 		}
 		printf("Path doesn't match anything (404)\n");	
 	} else {
-		printf("Not a GET request");
+		printf("Not a GET request\n");
 		/* send something suggesting unsupported method? */
 	}
 
+	free(this_req.method);
+	free(this_req.path);
 }
 
 void read_from_and_respond(int source_fd) {
@@ -200,7 +202,7 @@ void read_from_and_respond(int source_fd) {
 
 		char *temp = realloc(request, (request ? strlen(request) : 0) + bytes_read + 1);
 		if (!temp) {
-			perror("Failed to allocate memory for request");
+			perror("Failed to allocate memory for request\n");
 			free(request);
 			return;
 		}
@@ -219,6 +221,7 @@ void read_from_and_respond(int source_fd) {
 	}
 
 	handle_request(source_fd, request);
+	free(request);
 }
 
 int main() {
@@ -226,7 +229,7 @@ int main() {
 
 	int nfds = socket_fd + 1;	/* initial value for highest value file descriptor for select() */
 	fd_set rfds;				/* set of file descriptors watched for ready-to-read events */
-	FD_ZERO(&rfds);		
+	FD_ZERO(&rfds);
 	FD_SET(socket_fd, &rfds);
 	struct timeval select_timeout;
 
@@ -238,19 +241,26 @@ int main() {
 		fd_set temp_rfds = rfds;
 
 		int select_return_status = select(nfds, &temp_rfds, NULL, NULL, &select_timeout);
+		printf("select() invoked as a part of main loop with nfds %d\n", nfds);
 		if (select_return_status == -1)
-			perror("select() error status");
+			perror("select() error status\n");
+		/* else if (select_return_status == 0)
+			printf("select() timed out waiting for activity\n"); */
 	
 		/* iterate through the file descriptors */
+		/* printf("select() returned file descriptor(s) read to read -- iterating through them\n"); */
 		for (int i = 0; i < nfds; i++) {
 			if (FD_ISSET(i, &temp_rfds)) {
 				if (i == socket_fd) {	/* listening socket */
 					int client_fd = accept_new(socket_fd);
 					FD_SET(client_fd, &rfds);
-					if (client_fd >= nfds) 
+					if (client_fd >= nfds) {
 						nfds = client_fd + 1;
+						printf("Updated nfds to %d\n", nfds);
+					}
 				} else {				/* client connection socket */
 					read_from_and_respond(i);   /* closes fd after response */
+					printf("Clearing fd %d from rfds\n\n", i);
 					FD_CLR(i, &rfds);
 				}
 			}
