@@ -126,7 +126,6 @@ void serve_page(int source_fd, char *path) {
 	if (strcmp(path, "/") == 0) {
 		html_fd = open("pages/index.html", O_RDONLY);	
 	} else {
-		/* free??? */
 		char *full_path = malloc(sizeof(path)+7);
 		sprintf(full_path, "%s%s.html", PAGESDIR, path);
 		printf("Request for %s from fd: %i\n", full_path, source_fd);
@@ -168,6 +167,7 @@ void handle_request(int source_fd, char* req) {
 	if (parse_error) {
 		printf("Error parsing request");
 		/* reply_400(): handle error by sending 400 ? */
+		/* frees ? */
 		return;
 	}
 
@@ -180,7 +180,8 @@ void handle_request(int source_fd, char* req) {
 		}
 		printf("Path doesn't match anything (404)\n");	
 	} else {
-		printf("Not a GET request\n");
+		printf("Not a GET request: %s\n\n", this_req.method);
+		printf("Not a GET request: %s\n\n", req);
 		/* send something suggesting unsupported method? */
 	}
 
@@ -189,40 +190,78 @@ void handle_request(int source_fd, char* req) {
 }
 
 void read_from_and_respond(int source_fd) {
-	char read_buffer[BUFFER];
-	ssize_t bytes_read;
-	char *request = NULL; 
+    char read_buffer[BUFFER];
+    ssize_t bytes_read;
+    char *request = NULL;
+    size_t total_length = 0;
 
-	
     int flags = fcntl(source_fd, F_GETFL, 0);
     fcntl(source_fd, F_SETFL, flags | O_NONBLOCK);
-	/* handle maximum request size */
-	while ((bytes_read = read(source_fd, read_buffer, sizeof(read_buffer) - 1)) > 0) {
-		read_buffer[bytes_read] = '\0';
 
-		char *temp = realloc(request, (request ? strlen(request) : 0) + bytes_read + 1);
-		if (!temp) {
-			perror("Failed to allocate memory for request\n");
-			free(request);
-			return;
-		}
+    while ((bytes_read = read(source_fd, read_buffer, sizeof(read_buffer) - 1)) > 0) {
+        read_buffer[bytes_read] = '\0';
 
-		request = temp;
-		strcat(request, read_buffer);
-	}
+        char *temp = realloc(request, total_length + bytes_read + 1);
+        if (!temp) {
+            perror("Failed to allocate memory for request\n");
+            free(request);
+            return;
+        }
 
-	/* check errno for expected and non-problematic statuses from non-blocking reads of no data */
-	if (bytes_read == -1) {
-		if (errno != EAGAIN && errno != EWOULDBLOCK) {
-			perror("Error reading request");
-			free(request);
-			return;
-		}
-	}
+        request = temp;
+        memcpy(request + total_length, read_buffer, bytes_read + 1);
+        total_length += bytes_read;
+    }
 
-	handle_request(source_fd, request);
-	free(request);
+    if (bytes_read == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
+        perror("Error reading request");
+        free(request);
+        return;
+    }
+
+    if (request) {
+        request[total_length] = '\0';
+    }
+
+    handle_request(source_fd, request);
+    free(request);
 }
+
+// void read_from_and_respond(int source_fd) {
+// 	char read_buffer[BUFFER];
+// 	ssize_t bytes_read;
+// 	char *request = NULL; 
+// 
+// 	
+//     int flags = fcntl(source_fd, F_GETFL, 0);
+//     fcntl(source_fd, F_SETFL, flags | O_NONBLOCK);
+// 	/* handle maximum request size */
+// 	while ((bytes_read = read(source_fd, read_buffer, sizeof(read_buffer) - 1)) > 0) {
+// 		read_buffer[bytes_read] = '\0';
+// 
+// 		char *temp = realloc(request, (request ? strlen(request) : 0) + bytes_read + 1);
+// 		if (!temp) {
+// 			perror("Failed to allocate memory for request\n");
+// 			free(request);
+// 			return;
+// 		}
+// 
+// 		request = temp;
+// 		strcat(request, read_buffer);
+// 	}
+// 
+// 	/* check errno for expected and non-problematic statuses from non-blocking reads of no data */
+// 	if (bytes_read == -1) {
+// 		if (errno != EAGAIN && errno != EWOULDBLOCK) {
+// 			perror("Error reading request");
+// 			free(request);
+// 			return;
+// 		}
+// 	}
+// 
+// 	handle_request(source_fd, request);
+// 	free(request);
+// }
 
 int main() {
 	int socket_fd = create_server(); /* listening socket */

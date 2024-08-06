@@ -28,3 +28,5 @@ Possible future stuff
 - Fork a version that pulls in and utilizes an actual HTTP implementation?
 
 - Expand on my own very simple HTTP handling -- moving toward implementing some aspects of spec
+
+- Make millions off of this
