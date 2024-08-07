@@ -230,7 +230,7 @@ void read_from_and_respond(int source_fd) {
 // void read_from_and_respond(int source_fd) {
 // 	char read_buffer[BUFFER];
 // 	ssize_t bytes_read;
-// 	char *request = NULL; 
+// 	char *request = NULL;
 // 
 // 	
 //     int flags = fcntl(source_fd, F_GETFL, 0);
@@ -246,7 +246,8 @@ void read_from_and_respond(int source_fd) {
 // 			return;
 // 		}
 // 
-// 		request = temp;
+// 		temp[0] = '\0';
+// 		request = temp; /* hot damn */
 // 		strcat(request, read_buffer);
 // 	}
 // 
