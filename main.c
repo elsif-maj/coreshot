@@ -28,7 +28,7 @@ int create_server() {
 
 	server_sockname.sin_family = AF_INET;
 	server_sockname.sin_port = htons(8080); 
-	server_sockname.sin_addr.s_addr = htonl(INADDR_ANY);   /* what am I going to need to do to add IPv6 support?? */
+	server_sockname.sin_addr.s_addr = htonl(INADDR_ANY);
 
 	/* bind listening socket to address and port */
 	if (bind(socket_fd, (struct sockaddr *)&server_sockname, sizeof(server_sockname)) == -1) {
@@ -182,7 +182,7 @@ void handle_request(int source_fd, char* req) {
 	} else {
 		printf("Not a GET request: %s\n\n", this_req.method);
 		printf("Not a GET request: %s\n\n", req);
-		/* send something suggesting unsupported method? */
+		/* 405 "Method Not Allowed" */ 
 	}
 
 	free(this_req.method);
