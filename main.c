@@ -14,6 +14,8 @@
 #include "http_parser.h"
 #include "http_responder.h"
 
+#define REQ_LIMIT 8192
+
 char *PAGES[] = {"/", "/projects", "/links", "/site"};
 char *PAGESDIR = "pages";
 
@@ -129,6 +131,10 @@ void read_from_and_respond(int source_fd) {
     fcntl(source_fd, F_SETFL, flags | O_NONBLOCK);
 
     while ((bytes_read = read(source_fd, read_buffer, sizeof(read_buffer) - 1)) > 0) {
+		if (total_length > REQ_LIMIT) {
+			bytes_read = -1;
+			break;
+		}
         read_buffer[bytes_read] = '\0';
 
         char *temp = realloc(request, total_length + bytes_read + 1);
