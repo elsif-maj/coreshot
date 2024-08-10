@@ -4,19 +4,36 @@
 #include <string.h>
 #include "http_responder.h"
 
-struct http_status_msgs {
+struct http_status_msg {
 	int status;
 	char *msg;
 };
 
-/* create array of structs and accessor method for getting http status messages */
+struct http_status_msg http_status_msgs[] = {
+	{200, "OK"},
+	{400, "Bad Request"},
+	{404, "Not Found"},
+	{405, "Method Not Allowed"}
+};
+
+static char *get_status_msg(int status) {
+	for (int i = 0; i < (sizeof(http_status_msgs) / sizeof(http_status_msgs[0])); i++) {
+		if (status == http_status_msgs[i].status) {
+			return http_status_msgs[i].msg;	
+		}
+	}
+	return NULL;
+}
 
 static char* generate_headers(int status) {
-	/* make this sensitive to headers size calculation */
-	char *headers = malloc(512);
+	char *headers = malloc(128);
 	if (headers == NULL)
 		return NULL;
-	sprintf(headers, "HTTP/1.1 %d OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n", status);	
+	char *status_msg = get_status_msg(status);
+	if (status_msg == NULL)
+		return NULL;
+
+	sprintf(headers, "HTTP/1.1 %d %s\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n", status, status_msg);	
 	return headers;
 }
 
@@ -24,7 +41,7 @@ void http_res_fdsend(int status, int client_fd, int body_fd) {
 	/* Headers */
 	char *headers = generate_headers(status);
 	if (headers == NULL) {
-		perror("Error allocatinhg memory for headers");
+		perror("Error allocating memory or producing strings for headers");
 		return;
 	}
 
@@ -49,11 +66,15 @@ void http_res_fdsend(int status, int client_fd, int body_fd) {
 				break;
 			}
 		}
-	}
+	} 
+	if (close(client_fd) == -1)
+		perror("Error closing source_fd");
 }
 
-/*  stub for non-file-based response bodies
- *void http_res_ssend(int status, char *body) {
+/*  stub for non-file-based response bodies */
+/*
+ * void http_res_ssend(int status, char *body) {
  *
- *}
+ * }
+ *
  */

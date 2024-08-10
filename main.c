@@ -99,8 +99,7 @@ void handle_request(int source_fd, char* req) {
 		free(this_req.path);
 		this_req.path = NULL;
 
-		/* reply_400(): handle error by sending 400 ? */
-		/* http_res_400 */
+		http_res_fdsend(400, source_fd, -1);   /* Bad Request */
 		return;
 	}
 
@@ -111,12 +110,9 @@ void handle_request(int source_fd, char* req) {
 				return;
 			}
 		}
-		printf("Path doesn't match anything (404)\n");	
-		/* http_res_404 "Method Not Allowed" */ 
+		http_res_fdsend(404, source_fd, -1);
 	} else {
-		printf("Not a GET request: %s\n\n", this_req.method);
-		printf("Not a GET request: %s\n\n", req);
-		/* http_res_405 "Method Not Allowed" */ 
+		http_res_fdsend(405, source_fd, -1);  /* "Method Not Allowed" */ 
 	}
 
 	free(this_req.method);
