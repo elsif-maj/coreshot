@@ -11,13 +11,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include "http_parser.h"
 
 #define BUFFER 4096
-
-struct http_req {
-	char *method;
-	char *path;
-};
 
 char *PAGES[] = {"/", "/projects", "/links", "/site"};
 char *PAGESDIR = "pages";
@@ -62,59 +58,6 @@ int accept_new(int source_fd) {
 	printf("Client port: %d\n\n", ntohs(client_sockname.sin_port));
 
 	return client_fd;
-}
-
-/* refactor for 'unit start' and 'unit end' pointing to first and last chars -- get rid of offset */
-struct http_req parse_req(char *req, int *error) {
-	int offset = 0;
-	struct http_req this_req = { NULL, NULL };
-
-	/* parse http method */
-	char *method_end = req;
-	/* allow only 8 bytes of reading to find HTTP method */
-	while (*method_end != ' ' && offset < 8 && *method_end != '\0') {
-		method_end++;
-		offset += 1;
-	}
-
-	if (*method_end == ' ') {
-		char *method = malloc(offset + 1);
-		if (method == NULL) {
-			printf("Could not allocate memory for request method\n");
-			*error = 1;
-			return this_req;
-		}
-		memcpy(method, req, offset);
-		method[offset] = '\0';
-		this_req.method = method;
-	} else {
-		*error = 1;
-		printf("Could not parse request method\n");
-	}
-
-	/* parse http path */
-	char *path_end = method_end + 1;
-	offset = 0;
-	/* allow until end of req to find HTTP path */
-	while (*path_end != '\0' && *path_end != ' ')
-		path_end++;
-
-	if (*path_end == ' ') {
-		char *path = malloc(path_end - method_end);   /* contains one extra byte for '\0' */
-		if (path == NULL) {
-			printf("Could not allocate memory for request path\n");
-			*error = 1;
-			return this_req;
-		}
-		memcpy(path, method_end + 1, path_end - method_end - 1);
-		path[path_end - method_end - 1] = '\0';
-		this_req.path = path;
-	} else {
-		*error = 1;
-		printf("Could not parse request path\n");
-	}
-	
-	return this_req;
 }
 
 void serve_page(int source_fd, char *path) {
@@ -163,7 +106,7 @@ void serve_page(int source_fd, char *path) {
 
 void handle_request(int source_fd, char* req) {
 	int parse_error = 0;
-	struct http_req this_req = parse_req(req, &parse_error);
+	struct http_req this_req = http_parse_req(req, &parse_error);
 	if (parse_error) {
 		printf("Error parsing request");
 		/* reply_400(): handle error by sending 400 ? */
@@ -227,43 +170,6 @@ void read_from_and_respond(int source_fd) {
     free(request);
 }
 
-// void read_from_and_respond(int source_fd) {
-// 	char read_buffer[BUFFER];
-// 	ssize_t bytes_read;
-// 	char *request = NULL;
-// 
-// 	
-//     int flags = fcntl(source_fd, F_GETFL, 0);
-//     fcntl(source_fd, F_SETFL, flags | O_NONBLOCK);
-// 	/* handle maximum request size */
-// 	while ((bytes_read = read(source_fd, read_buffer, sizeof(read_buffer) - 1)) > 0) {
-// 		read_buffer[bytes_read] = '\0';
-// 
-// 		char *temp = realloc(request, (request ? strlen(request) : 0) + bytes_read + 1);
-// 		if (!temp) {
-// 			perror("Failed to allocate memory for request\n");
-// 			free(request);
-// 			return;
-// 		}
-// 
-// 		temp[0] = '\0';
-// 		request = temp; /* hot damn */
-// 		strcat(request, read_buffer);
-// 	}
-// 
-// 	/* check errno for expected and non-problematic statuses from non-blocking reads of no data */
-// 	if (bytes_read == -1) {
-// 		if (errno != EAGAIN && errno != EWOULDBLOCK) {
-// 			perror("Error reading request");
-// 			free(request);
-// 			return;
-// 		}
-// 	}
-// 
-// 	handle_request(source_fd, request);
-// 	free(request);
-// }
-
 int main() {
 	int socket_fd = create_server(); /* listening socket */
 
@@ -281,14 +187,10 @@ int main() {
 		fd_set temp_rfds = rfds;
 
 		int select_return_status = select(nfds, &temp_rfds, NULL, NULL, &select_timeout);
-		printf("select() invoked as a part of main loop with nfds %d\n", nfds);
 		if (select_return_status == -1)
 			perror("select() error status\n");
-		/* else if (select_return_status == 0)
-			printf("select() timed out waiting for activity\n"); */
 	
 		/* iterate through the file descriptors */
-		/* printf("select() returned file descriptor(s) read to read -- iterating through them\n"); */
 		for (int i = 0; i < nfds; i++) {
 			if (FD_ISSET(i, &temp_rfds)) {
 				if (i == socket_fd) {	/* listening socket */

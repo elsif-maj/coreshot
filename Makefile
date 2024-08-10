@@ -1,7 +1,7 @@
 CC=gcc
 CFLAGS=-I.
-DEPS = main.c
-OBJ = main.o
+DEPS = main.c http_parser.c
+OBJ = main.o http_parser.o
 OUT = coreshot
 
 %.o: %.c $(DEPS)
