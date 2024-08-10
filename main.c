@@ -109,8 +109,13 @@ void handle_request(int source_fd, char* req) {
 	struct http_req this_req = http_parse_req(req, &parse_error);
 	if (parse_error) {
 		printf("Error parsing request");
+
+		free(this_req.method);
+		this_req.method = NULL;
+		free(this_req.path);
+		this_req.path = NULL;
+
 		/* reply_400(): handle error by sending 400 ? */
-		/* frees ? */
 		return;
 	}
 

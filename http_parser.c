@@ -3,13 +3,15 @@
 #include <string.h>
 #include "http_parser.h"
 
+#define PARSE_LIMIT 8
 
 /* parse http method */
 char *http_method_parse(struct http_req *this_req, char *req, int *error) {
 	int offset = 0;
 	char *method_end = req;
+
 	/* allow only 8 bytes of reading to find HTTP method */
-	while (*method_end != ' ' && offset < 8 && *method_end != '\0') {
+	while (*method_end != ' ' && offset < PARSE_LIMIT && *method_end != '\0') {
 		method_end++;
 		offset += 1;
 	}
@@ -63,7 +65,9 @@ struct http_req http_parse_req(char *req, int *error) {
 
 	/* refactor for 'unit start' and 'unit end' pointing to first and last chars -- get rid of offset */
 	char *method_end = http_method_parse(&this_req, req, error);
+	if (*error == 1)
+		return this_req;
+
 	http_path_parse(&this_req, req, method_end, error);
-	
 	return this_req;
 }
