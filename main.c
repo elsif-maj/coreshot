@@ -69,7 +69,7 @@ void serve_page(int source_fd, char *path) {
 	if (strcmp(path, "/") == 0) {
 		html_fd = open("pages/index.html", O_RDONLY);	
 	} else {
-		char *full_path = malloc(sizeof(path)+7);
+		char *full_path = malloc(strlen(path) + strlen(PAGESDIR) + 6);
 		sprintf(full_path, "%s%s.html", PAGESDIR, path);
 		printf("Request for %s from fd: %i\n", full_path, source_fd);
 
@@ -81,6 +81,8 @@ void serve_page(int source_fd, char *path) {
 		perror("Error opening file");
 		return;
 	}
+	
+	/* http_res_200(int source_fd, int html_fd) */
 
 	bytes_written = write(source_fd, &headers, sizeof(headers));
 	if (bytes_written == -1) {
@@ -116,6 +118,7 @@ void handle_request(int source_fd, char* req) {
 		this_req.path = NULL;
 
 		/* reply_400(): handle error by sending 400 ? */
+		/* http_res_400 */
 		return;
 	}
 
@@ -127,10 +130,11 @@ void handle_request(int source_fd, char* req) {
 			}
 		}
 		printf("Path doesn't match anything (404)\n");	
+		/* http_res_404 "Method Not Allowed" */ 
 	} else {
 		printf("Not a GET request: %s\n\n", this_req.method);
 		printf("Not a GET request: %s\n\n", req);
-		/* 405 "Method Not Allowed" */ 
+		/* http_res_405 "Method Not Allowed" */ 
 	}
 
 	free(this_req.method);
