@@ -13,6 +13,7 @@
 #include <errno.h>
 #include "http_parser.h"
 #include "http_responder.h"
+#include "logging.h"
 
 #define REQ_LIMIT 8192
 
@@ -20,6 +21,7 @@ char *PAGES[] = {"/", "/projects", "/links", "/site"};
 char *PAGESDIR = "pages";
 
 int create_server() {
+	test_log();
 	int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
 	struct sockaddr_in server_sockname;
 
