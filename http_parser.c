@@ -6,7 +6,7 @@
 #define PARSE_LIMIT 8
 
 /* parse http method */
-char *http_method_parse(struct http_req *this_req, char *req, int *error) {
+static char *http_method_parse(struct http_req *this_req, char *req, int *error) {
 	int offset = 0;
 	char *method_end = req;
 
@@ -35,7 +35,7 @@ char *http_method_parse(struct http_req *this_req, char *req, int *error) {
 }
 
 /* parse http path */
-void http_path_parse(struct http_req *this_req, char *req, char *method_end, int *error) {
+static void http_path_parse(struct http_req *this_req, char *req, char *method_end, int *error) {
 	char *path_end = method_end + 1;
 	/* allow until end of req to find HTTP path */
 	while (*path_end != '\0' && *path_end != ' ')
