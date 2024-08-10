@@ -12,8 +12,7 @@
 #include <string.h>
 #include <errno.h>
 #include "http_parser.h"
-
-#define BUFFER 4096
+#include "http_responder.h"
 
 char *PAGES[] = {"/", "/projects", "/links", "/site"};
 char *PAGESDIR = "pages";
@@ -61,10 +60,7 @@ int accept_new(int source_fd) {
 }
 
 void serve_page(int source_fd, char *path) {
-	char html_buffer[BUFFER];
-	char headers[] = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n";
-	ssize_t bytes_read, bytes_written;
-	int html_fd;
+	int html_fd = -1;
 
 	if (strcmp(path, "/") == 0) {
 		html_fd = open("pages/index.html", O_RDONLY);	
@@ -82,23 +78,9 @@ void serve_page(int source_fd, char *path) {
 		return;
 	}
 	
-	/* http_res_200(int source_fd, int html_fd) */
+	/* response */
+	http_res_fdsend(200, source_fd, html_fd);
 
-	bytes_written = write(source_fd, &headers, sizeof(headers));
-	if (bytes_written == -1) {
-		perror("Error writing headers");
-		return;
-	}
-
-	while ((bytes_read = read(html_fd, &html_buffer, sizeof(html_buffer) - 1)) > 0) {
-		bytes_written = 0;
-		bytes_written = write(source_fd, &html_buffer, bytes_read);
-		if (bytes_written < bytes_read) {
-			perror("Couldn't write whole buffer to source_fd");
-			break;
-		}
-	}
-	
 	printf("PAGE SERVED: now closing html page fd: %d and client fd: %d\n", html_fd, source_fd);
 	if (close(source_fd) == -1)
 		perror("Error closing source_fd");
