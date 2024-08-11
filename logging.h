@@ -1,6 +1,6 @@
 #ifndef LOGGING
 #define LOGGING
 
-void test_log();
+void logging_server_start();
 
 #endif /* LOGGING */
