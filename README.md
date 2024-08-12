@@ -14,7 +14,7 @@ These are some functionalities, features, or changes that I will make happen soo
 
 - Switch to poll or epoll
 
-- Add some sort of logging
+- Create passable logging 
 
 - IPv6 support
 

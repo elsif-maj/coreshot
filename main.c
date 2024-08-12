@@ -1,4 +1,4 @@
-#include <bits/types/struct_timeval.h>
+#include <sys/time.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -21,7 +21,6 @@ char *PAGES[] = {"/", "/projects", "/links", "/site"};
 char *PAGESDIR = "pages";
 
 int create_server() {
-	logging_server_start();
 	int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
 	struct sockaddr_in server_sockname;
 
@@ -34,15 +33,16 @@ int create_server() {
 		perror("Failed to bind socket");
 		return 1;
 	}
-	printf("Socket binding successful to port %d at address %d\n", ntohs(server_sockname.sin_port), server_sockname.sin_addr.s_addr);
 	
 	/* listen on socket for attempts to connect */
 	if (listen(socket_fd, 128) == -1) {
 		perror("Failed to listen on socket");
 		return 1;
 	}
-	printf("Socket is listening on port %d\n", ntohs(server_sockname.sin_port));
 
+	logging_server_start();
+	printf("Socket binding successful to port %d at address %d\n", ntohs(server_sockname.sin_port), server_sockname.sin_addr.s_addr);
+	printf("Socket is listening on port %d\n", ntohs(server_sockname.sin_port));
 	return socket_fd;
 }
 
@@ -85,11 +85,11 @@ void serve_page(int source_fd, char *path) {
 	/* response */
 	http_res_fdsend(200, source_fd, html_fd);
 
-	printf("PAGE SERVED: now closing html page fd: %d and client fd: %d\n", html_fd, source_fd);
-	if (close(source_fd) == -1)
-		perror("Error closing source_fd");
-	if (close(html_fd) == -1)
-		perror("Error closing html_fd");
+	// printf("PAGE SERVED: now closing html page fd: %d and client fd: %d\n", html_fd, source_fd);
+	// if (close(source_fd) == -1)
+	// 	perror("Error closing source_fd");
+	// if (close(html_fd) == -1)
+	// 	perror("Error closing html_fd");
 }
 
 void handle_request(int source_fd, char* req) {
@@ -166,6 +166,8 @@ void read_from_and_respond(int source_fd) {
 }
 
 int main() {
+	setvbuf(stdout, NULL, _IONBF, 0); /* flush printfs? */
+
 	int socket_fd = create_server(); /* listening socket */
 
 	int nfds = socket_fd + 1;	/* initial value for highest value file descriptor for select() */
