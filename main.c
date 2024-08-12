@@ -166,7 +166,7 @@ void read_from_and_respond(int source_fd) {
 }
 
 int main() {
-	setvbuf(stdout, NULL, _IONBF, 0); /* flush printfs? */
+	setvbuf(stdout, NULL, _IOLBF, 0); /* flush printfs? */
 
 	int socket_fd = create_server(); /* listening socket */
 
