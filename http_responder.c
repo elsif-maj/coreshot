@@ -66,6 +66,8 @@ void http_res_fdsend(int status, int client_fd, int body_fd) {
 				break;
 			}
 		}
+		if (close(body_fd) == -1)
+			perror("Error closing body_fd");
 	} 
 	if (close(client_fd) == -1)
 		perror("Error closing source_fd");

@@ -84,12 +84,6 @@ void serve_page(int source_fd, char *path) {
 	
 	/* response */
 	http_res_fdsend(200, source_fd, html_fd);
-
-	// printf("PAGE SERVED: now closing html page fd: %d and client fd: %d\n", html_fd, source_fd);
-	// if (close(source_fd) == -1)
-	// 	perror("Error closing source_fd");
-	// if (close(html_fd) == -1)
-	// 	perror("Error closing html_fd");
 }
 
 void handle_request(int source_fd, char* req) {
