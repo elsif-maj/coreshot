@@ -21,7 +21,7 @@ These are some functionalities, features, or changes that I will make happen soo
 Possible future stuff
 -----------
 
-- SSL 
+- Fork w/ SSL 
 
 - Fork a version that pulls in and utilizes an actual HTTP implementation
 
