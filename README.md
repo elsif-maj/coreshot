@@ -7,19 +7,10 @@ coreshot does not fully implement any generation of HTTP specification -- functi
 
 coreshot was created as a skill-development exercise as my first development project using the C language. As such, I do not recommend using any part of it for any reason should anyone ever somehow be tempted. Given the language, the functional role that it is supposed to fill, and my experience-level with C development, it may be the engineering-artifact equivalent of a jet-engine motorcycle made out of paper mache by a kindergardner.
 
-Changes to come
------------
-
-These are some functionalities, features, or changes that I will make happen soon:
-
-- Switch to poll or epoll
-
-- Create passable logging 
-
-- IPv6 support
-
 Possible future stuff
 -----------
+
+- IPv6 support
 
 - Fork w/ SSL 
 
